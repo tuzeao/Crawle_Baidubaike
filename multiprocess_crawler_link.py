@@ -32,15 +32,15 @@ async def main_crawler(url, yixiang, request_headers, db):
     while True:
         try:
             async with aiohttp.ClientSession() as session:
-                response = await session.get(url, headers=request_headers)
-                break
+                async with session.get(url, headers=request_headers) as response:
+                    req_text = await response.text()
+                    break
         except:
             print("#####Please wait 3 seconds#####")
             time.sleep(1)
             times += 1
             if times >= 3:
                 return None
-    req_text = await response.text()
 
     soup = BeautifulSoup(req_text, 'lxml')
     if soup.find('div', attrs={'class': 'lemmaWgt-subLemmaListTitle'}):
@@ -99,15 +99,16 @@ async def get_page_link(url, request_headers):
     while True:
         try:
             async with aiohttp.ClientSession() as session:
-                response = await session.get(url, headers=request_headers, timeout=1)
-                break
+                async with session.get(url, headers=request_headers) as response:
+                    req_text = await response.text()
+                    break
         except:
             print("#####Please wait 3 seconds#####")
             time.sleep(1)
             times += 1
             if times >= 3:
                 return None
-    req_text = response.text
+    # req_text = response.text
 
     soup = BeautifulSoup(req_text, 'lxml')
     main_content = soup.find('div', attrs={'class':'main-content'})
@@ -145,8 +146,9 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
         while True:
             try:
                 async with aiohttp.ClientSession() as session:
-                    response = await session.get(href, headers=request_headers, timeout=1)
-                    break
+                    async with session.get(href, headers=request_headers) as response:
+                        req_text = await response.text()
+                        break
             except:
                 print("#####Please wait 3 seconds#####")
                 flag = False
@@ -166,7 +168,7 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
         if not flag:
             # 如果目标超链接页面无效的，则直接跳过该页面
             continue
-        req_text = response.text
+        # req_text = response.text
         soup = BeautifulSoup(req_text, 'lxml')
         # 得到每个链接对应的义项描述
         link_label = await get_link_label(soup)
