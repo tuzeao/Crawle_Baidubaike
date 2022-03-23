@@ -151,7 +151,7 @@ def iterate_all_page_links(link_list, request_headers, db_all):
         try:
             db_all.insert_one(
                 {
-                    '_id': href+link_title,
+                    '_id': link_title+link_label,
                     # 'text': ''.join(response.xpath('//div[@class="lemma-summary"]').xpath('//div[@class="para"]//text()').getall())
                     'link': href,
                     'title': link_title,
