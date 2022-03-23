@@ -14,6 +14,10 @@ from bs4 import BeautifulSoup
 import urllib.parse
 from collections import defaultdict
 from multiprocessing import Process, Queue, Manager, Lock
+import pymongo
+db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
+# db_all = db['triple']
+db_all = db['test1']
 
 def construct_url(keyword):
     baseurl = 'https://baike.baidu.com/item/'
@@ -28,8 +32,8 @@ def main_crawler(url, yixiang, request_headers):
             response = requests.get(url, headers=request_headers)
             break
         except:
-            print("#####Please wait 10 seconds#####")
-            time.sleep(10)
+            print("#####Please wait 3 seconds#####")
+            time.sleep(3)
     print(response.url, response.status_code)
     req_text = response.text
     soup = BeautifulSoup(req_text, 'lxml')
@@ -91,7 +95,7 @@ def get_page_link(url, request_headers):
             break
         except:
             print("#####Please wait 10 seconds#####")
-            time.sleep(10)
+            time.sleep(3)
     soup = BeautifulSoup(req_text, 'lxml')
     main_content = soup.find('div', attrs={'class':'main-content'})
     a_label = main_content.find_all('a', attrs={'target':'_blank'})
@@ -130,8 +134,8 @@ def iterate_all_page_links(link_list, request_headers):
                 break
             except:
                 flag = False
-                print("#####Please wait 10 seconds#####")
-                time.sleep(10)
+                print("#####Please wait 3 seconds#####")
+                time.sleep(3)
         if not flag:
             # 如果目标超链接页面无效的，则直接跳过该页面
             continue
@@ -144,6 +148,20 @@ def iterate_all_page_links(link_list, request_headers):
         item_dict['Title'] = link_title
         item_dict['Label'] = link_label
         link_data.append(item_dict)
+        try:
+            db_all.insert_one(
+                {
+                    '_id': href+link_title,
+                    # 'text': ''.join(response.xpath('//div[@class="lemma-summary"]').xpath('//div[@class="para"]//text()').getall())
+                    'link': href,
+                    'title': link_title,
+                    'label': link_label,
+                    'text': req_text
+                })
+            print(f"insert: {href+link_title}")
+        except pymongo.errors.DuplicateKeyError:
+            print(f"duplicate: {href+link_title}")
+            pass
 
     return link_data
 
