@@ -15,9 +15,6 @@ import urllib.parse
 from collections import defaultdict
 from multiprocessing import Process, Queue, Manager, Lock
 import pymongo
-db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
-# db_all = db['triple']
-db_all = db['test1']
 lock = Lock()
 
 
@@ -26,7 +23,7 @@ def construct_url(keyword):
     url = baseurl + str(keyword)
     return url
 
-def main_crawler(url, yixiang, request_headers):
+def main_crawler(url, yixiang, request_headers, db):
     """对知识库中的每一个subject，访问其百度百科页面，然后获取页面下所有的超链接"""
     link_list = []
     while True:
@@ -51,7 +48,7 @@ def main_crawler(url, yixiang, request_headers):
                 redirect_url = "https://baike.baidu.com" + a_label['href']
                 # 重新获取到该subject对应页面的链接地址，访问获取到页面下的所有超链接
                 entity_link_list = get_page_link(redirect_url, request_headers)
-                link_list = iterate_all_page_links(entity_link_list, request_headers)
+                link_list = iterate_all_page_links(entity_link_list, request_headers, db)
                 return link_list
     elif soup.find('ul', attrs={'class': 'polysemantList-wrapper cmn-clearfix'}):
         # 说明进入了对应subject的百科页面，如果是多义词找到对应义项描述的链接网页
@@ -63,19 +60,19 @@ def main_crawler(url, yixiang, request_headers):
                 if not li.find('a'):
                     # 未发现a标签，则说明是当前页面下，则直接使用原始的Url链接
                     entity_link_list = get_page_link(url, request_headers)
-                    link_list = iterate_all_page_links(entity_link_list, request_headers)
+                    link_list = iterate_all_page_links(entity_link_list, request_headers, db)
                     return link_list
                 else:
                     # 否则获取新的重定向链接
                     a_label = li.find('a')
                     redirect_url = "https://baike.baidu.com" + a_label['href']
                     entity_link_list = get_page_link(redirect_url, request_headers)
-                    link_list = iterate_all_page_links(entity_link_list, request_headers)
+                    link_list = iterate_all_page_links(entity_link_list, request_headers, db)
                     return link_list
     elif soup.find('dd', attrs={'class':'lemmaWgt-lemmaTitle-title'}):
         # 如果subject对应的页面是单义词，则直接获取页面下的所有超链接
         entity_link_list = get_page_link(url, request_headers)
-        link_list = iterate_all_page_links(entity_link_list, request_headers)
+        link_list = iterate_all_page_links(entity_link_list, request_headers, db)
         return link_list
     else:
         # 可能是未知页面，返回None
@@ -114,7 +111,7 @@ def get_page_link(url, request_headers):
 
     return entity_link_list
 
-def iterate_all_page_links(link_list, request_headers):
+def iterate_all_page_links(link_list, request_headers, db_all):
     """对于某一个页面下的所有超链接，获取每个超链接的href、页面title和义项描述"""
     title_href = "https://baike.baidu.com"
     baike_id_list = []
@@ -150,7 +147,7 @@ def iterate_all_page_links(link_list, request_headers):
         item_dict['Title'] = link_title
         item_dict['Label'] = link_label
         link_data.append(item_dict)
-        lock.acquire()
+        # lock.acquire()
         try:
             db_all.insert_one(
                 {
@@ -165,7 +162,7 @@ def iterate_all_page_links(link_list, request_headers):
         except pymongo.errors.DuplicateKeyError:
             print(f"duplicate: {href+link_title}")
             pass
-        lock.release()
+        # lock.release()
 
     return link_data
 
@@ -235,6 +232,9 @@ class CrawlerProcess(Process):
         self.id2subject = id2subject
         self.describe_dict = describe_dict
         self.request_headers = request_headers
+        self.db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
+        # db_all = db['triple']
+        self.db_all = self.db['test1']
 
     def run(self):
         # 每一个进程不断从实体池中取实体，直到实体池为空
@@ -259,7 +259,7 @@ class CrawlerProcess(Process):
             # 根据实体名，构造百度百科访问地址
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
-            link_data = main_crawler(url, yixiang, self.request_headers)
+            link_data = main_crawler(url, yixiang, self.request_headers, self.db_all)
             entity_link_dict = dict()
             if link_data is None or len(link_data) == 0:
                 # 可能有页面没有超链接的情况
