@@ -18,6 +18,8 @@ import pymongo
 db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
 # db_all = db['triple']
 db_all = db['test1']
+lock = Lock()
+
 
 def construct_url(keyword):
     baseurl = 'https://baike.baidu.com/item/'
@@ -148,6 +150,7 @@ def iterate_all_page_links(link_list, request_headers):
         item_dict['Title'] = link_title
         item_dict['Label'] = link_label
         link_data.append(item_dict)
+        lock.acquire()
         try:
             db_all.insert_one(
                 {
@@ -162,6 +165,7 @@ def iterate_all_page_links(link_list, request_headers):
         except pymongo.errors.DuplicateKeyError:
             print(f"duplicate: {href+link_title}")
             pass
+        lock.release()
 
     return link_data
 
@@ -309,7 +313,6 @@ if __name__ == '__main__':
     id_list = Manager().list(id2subject.keys())
     process_num = 6
     q = Manager().Queue(100)
-    lock = Lock()
     l = []
     for i in range(process_num):
         p = CrawlerProcess(id_list=id_list, q=q, lock=lock, id2subject=id2subject, describe_dict=describe_dict,
