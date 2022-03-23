@@ -250,6 +250,58 @@ def page_type(soup):
         # 对于不是多义词，只有每一个词的页面
         return 3
 
+
+class Input:
+    def __init__(self, link, title, label):
+        self.link = link
+        self.title = title
+        self.label = label
+
+    def __str__(self):
+        return self.link
+
+class Node:  # 辅助树节点
+    def __init__(self, val=None, isEnd=False):
+        self.val = val  # 当前值
+        self.next = {}  # 子集合, dict形式, 比如apple就是 {'a': Node('p')}, {'p': Node('p')}
+        self.isEnd = isEnd  # 是否是结尾
+
+
+class Trie:
+    def __init__(self):
+        self.node = Node()
+
+    def insert(self, word):
+        tmp = self.node  # 初始节点None, 其子集合为单词开头
+        for i in word:
+            if i not in tmp.next:
+                tmp.next[i] = Node(i)  # 将当前字母插入子集合里
+            tmp = tmp.next[i]
+        tmp.isEnd = True
+
+    def search(self, word):
+        tmp = self.node
+        for i in word:
+            if i not in tmp.next:
+                return False
+            tmp = tmp.next[i]
+        if tmp.isEnd:  # 与上两行属于一套的
+            return True
+        return False
+
+    def startsWith(self, prefix):
+        tmp = self.node
+        for i in prefix:
+            if i not in tmp.next:
+                return False
+            tmp = tmp.next[i]
+        return True
+
+
+tr = Trie()
+
+
+
 class CrawlerProcess(Process):
     def __init__(self, id_list, q, lock, id2subject, describe_dict, request_headers):
         """
@@ -272,52 +324,116 @@ class CrawlerProcess(Process):
         # 每一个进程不断从实体池中取实体，直到实体池为空
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
-        db_all = db['test1']
-        while len(self.id_list) != 0:
+        db_all = db['test2']
+
+        # url_list = [
+        #     {
+        #         "Link": "https://baike.baidu.com/item/%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD",
+        #         "Title": "中国",
+        #         "Label": "中华人民共和国"
+        #     }
+        # ]
+
+        url_list = [Input(link="https://baike.baidu.com/item/%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD",
+                          title="中国",
+                          label="中华人民共和国")]
+
+        # tr.insert(url_list[0])
+        # mark_list = {"中国-中华人民共和国"}
+
+        # while len(self.id_list) != 0:
+        #     # 加锁
+        #     self.lock.acquire()
+        #     if len(self.id_list) == 0:
+        #         # 额外的一个退出判断，防止出现只有最后一个实体，但有多个进程进入了while循环的情况
+        #         self.lock.release()
+        #         break
+        #     # 从实体池中随机选取一个实体
+        #     choice_id = random.choice(self.id_list)
+        #     # 选完后删除
+        #     self.id_list.remove(choice_id)
+        #     # 解锁
+        #     self.lock.release()
+        #
+        #     # 由实体id转换为对应的实体名
+        #     subject = self.id2subject[choice_id]
+        #     # 这里的义项描述，则表示额外的消歧信息，来帮助获取到正确的对应页面
+        #     yixiang = self.describe_dict[choice_id]
+        #     # 根据实体名，构造百度百科访问地址
+        #     url = construct_url(keyword=subject)
+        #     # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
+        #     link_data = asyncio.get_event_loop().run_until_complete(main_crawler(url, yixiang, self.request_headers, db_all))
+        #     entity_link_dict = dict()
+        #     if link_data is None or len(link_data) == 0:
+        #         # 可能有页面没有超链接的情况
+        #         entity_link_dict[choice_id] = "Null"
+        #     else:
+        #         entity_link_dict[choice_id] = link_data
+        #
+        #     if link_data:
+        #         _tmp = [x["Link"] for x in link_data]
+        #         url_list.append(_tmp)
+        #
+        #
+        #     # print(os.getpid(), choice_id, self.q.qsize(), entity_link_dict)
+        #
+        #     # 将抓取到的数据放到队列中保存
+        #     # self.q.put(entity_link_dict)
+        #
+        #     # 判断队列是否满队
+        #     # if self.q.full():
+        #         # 释放队列内容，直到队列为空
+        #         # while not self.q.empty():
+        #         #     link_dict = self.q.get()
+        #             # 因为需要对本地文件进行写入，所以也需要加入锁，防止不同进程之间的写入混乱
+        #             # self.lock.acquire()
+        #             # with open('./multi_link_data/subject_hyperlinks.json', 'a', encoding='utf-8') as fin:
+        #             #     json.dump(link_dict, fin, ensure_ascii=False)
+        #             #     fin.write('\n')
+        #             # self.lock.release()
+
+        while len(url_list) != 0:
             # 加锁
             self.lock.acquire()
-            if len(self.id_list) == 0:
+            if len(url_list) == 0:
                 # 额外的一个退出判断，防止出现只有最后一个实体，但有多个进程进入了while循环的情况
                 self.lock.release()
                 break
             # 从实体池中随机选取一个实体
-            choice_id = random.choice(self.id_list)
+            url_info = url_list[-1]
             # 选完后删除
-            self.id_list.remove(choice_id)
+            url_list.pop()
             # 解锁
             self.lock.release()
+            if tr.search(url_info.link): continue
 
             # 由实体id转换为对应的实体名
-            subject = self.id2subject[choice_id]
+            subject = url_info.title
             # 这里的义项描述，则表示额外的消歧信息，来帮助获取到正确的对应页面
-            yixiang = self.describe_dict[choice_id]
+            yixiang = url_info.label
             # 根据实体名，构造百度百科访问地址
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
-            link_data = asyncio.get_event_loop().run_until_complete(main_crawler(url, yixiang, self.request_headers, db_all))
-            entity_link_dict = dict()
-            if link_data is None or len(link_data) == 0:
-                # 可能有页面没有超链接的情况
-                entity_link_dict[choice_id] = "Null"
-            else:
-                entity_link_dict[choice_id] = link_data
+            link_data = asyncio.get_event_loop().run_until_complete(
+                main_crawler(url, yixiang, self.request_headers, db_all))
+            # entity_link_dict = dict()
+            # if link_data is None or len(link_data) == 0:
+            #     # 可能有页面没有超链接的情况
+            #     entity_link_dict[choice_id] = "Null"
+            # else:
+            #     entity_link_dict[choice_id] = link_data
 
-            # print(os.getpid(), choice_id, self.q.qsize(), entity_link_dict)
+            if link_data:
+                for info in link_data:
+                    if tr.search(info["Link"]):
+                        continue
+                    url_list.append(Input(
+                        link=info["Link"],
+                        title=info["Title"],
+                        label=info["Label"]
+                    ))
+                    tr.insert(info["Link"])
 
-            # 将抓取到的数据放到队列中保存
-            self.q.put(entity_link_dict)
-
-            # 判断队列是否满队
-            if self.q.full():
-                # 释放队列内容，直到队列为空
-                while not self.q.empty():
-                    link_dict = self.q.get()
-                    # 因为需要对本地文件进行写入，所以也需要加入锁，防止不同进程之间的写入混乱
-                    # self.lock.acquire()
-                    # with open('./multi_link_data/subject_hyperlinks.json', 'a', encoding='utf-8') as fin:
-                    #     json.dump(link_dict, fin, ensure_ascii=False)
-                    #     fin.write('\n')
-                    # self.lock.release()
 
 if __name__ == '__main__':
     request_headers = {
@@ -346,7 +462,7 @@ if __name__ == '__main__':
 
     start_time = time.time()
     id_list = Manager().list(id2subject.keys())
-    process_num = 64
+    process_num = 1
     q = Manager().Queue(100)
     l = []
     for i in range(process_num):
