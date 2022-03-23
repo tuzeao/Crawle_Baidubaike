@@ -32,7 +32,7 @@ async def main_crawler(url, yixiang, request_headers, db):
     while True:
         try:
             async with aiohttp.ClientSession() as session:
-                response = await session.get(url, headers=request_headers, timeout=1)
+                response = await session.get(url, headers=request_headers)
                 break
         except:
             print("#####Please wait 3 seconds#####")
@@ -40,7 +40,7 @@ async def main_crawler(url, yixiang, request_headers, db):
             times += 1
             if times >= 3:
                 return None
-    req_text = response.text
+    req_text = await response.text()
 
     soup = BeautifulSoup(req_text, 'lxml')
     if soup.find('div', attrs={'class': 'lemmaWgt-subLemmaListTitle'}):
@@ -264,11 +264,11 @@ class CrawlerProcess(Process):
         self.describe_dict = describe_dict
         self.request_headers = request_headers
 
-    async def run(self):
+    def run(self):
         # 每一个进程不断从实体池中取实体，直到实体池为空
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
-        db_all = db['test1']
+        db_all = db['test2']
         while len(self.id_list) != 0:
             # 加锁
             self.lock.acquire()
@@ -290,7 +290,7 @@ class CrawlerProcess(Process):
             # 根据实体名，构造百度百科访问地址
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
-            link_data = await main_crawler(url, yixiang, self.request_headers, db_all)
+            link_data = asyncio.get_event_loop().run_until_complete(main_crawler(url, yixiang, self.request_headers, db_all))
             entity_link_dict = dict()
             if link_data is None or len(link_data) == 0:
                 # 可能有页面没有超链接的情况
@@ -342,12 +342,11 @@ if __name__ == '__main__':
 
     start_time = time.time()
     id_list = Manager().list(id2subject.keys())
-    process_num = 6
+    process_num = 1
     q = Manager().Queue(100)
     l = []
     for i in range(process_num):
-        p = CrawlerProcess(id_list=id_list, q=q, lock=lock, id2subject=id2subject, describe_dict=describe_dict,
-                           request_headers=request_headers)
+        p = CrawlerProcess(id_list=id_list, q=q, lock=lock, id2subject=id2subject, describe_dict=describe_dict, request_headers=request_headers)
         p.start()
         l.append(p)
     [p.join() for p in l]
