@@ -232,12 +232,12 @@ class CrawlerProcess(Process):
         self.id2subject = id2subject
         self.describe_dict = describe_dict
         self.request_headers = request_headers
-        self.db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
-        # db_all = db['triple']
-        self.db_all = self.db['test1']
 
     def run(self):
         # 每一个进程不断从实体池中取实体，直到实体池为空
+        db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
+        # db_all = db['triple']
+        db_all = db['test1']
         while len(self.id_list) != 0:
             # 加锁
             self.lock.acquire()
@@ -259,7 +259,7 @@ class CrawlerProcess(Process):
             # 根据实体名，构造百度百科访问地址
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
-            link_data = main_crawler(url, yixiang, self.request_headers, self.db_all)
+            link_data = main_crawler(url, yixiang, self.request_headers, db_all)
             entity_link_dict = dict()
             if link_data is None or len(link_data) == 0:
                 # 可能有页面没有超链接的情况
@@ -278,11 +278,11 @@ class CrawlerProcess(Process):
                 while not self.q.empty():
                     link_dict = self.q.get()
                     # 因为需要对本地文件进行写入，所以也需要加入锁，防止不同进程之间的写入混乱
-                    self.lock.acquire()
-                    with open('./multi_link_data/subject_hyperlinks.json', 'a', encoding='utf-8') as fin:
-                        json.dump(link_dict, fin, ensure_ascii=False)
-                        fin.write('\n')
-                    self.lock.release()
+                    # self.lock.acquire()
+                    # with open('./multi_link_data/subject_hyperlinks.json', 'a', encoding='utf-8') as fin:
+                    #     json.dump(link_dict, fin, ensure_ascii=False)
+                    #     fin.write('\n')
+                    # self.lock.release()
 
 if __name__ == '__main__':
     request_headers = {
