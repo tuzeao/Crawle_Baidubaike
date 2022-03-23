@@ -109,10 +109,12 @@ async def get_page_link(url, request_headers):
             if times >= 3:
                 return None
     # req_text = response.text
-
-    soup = BeautifulSoup(req_text, 'lxml')
-    main_content = soup.find('div', attrs={'class':'main-content'})
-    a_label = main_content.find_all('a', attrs={'target':'_blank'})
+    try:
+        soup = BeautifulSoup(req_text, 'lxml')
+        main_content = soup.find('div', attrs={'class':'main-content'})
+        a_label = main_content.find_all('a', attrs={'target':'_blank'})
+    except:
+        return []
     for a_tag in a_label:
         try:
             href = a_tag['href']
@@ -270,7 +272,7 @@ class CrawlerProcess(Process):
         # 每一个进程不断从实体池中取实体，直到实体池为空
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
-        db_all = db['test2']
+        db_all = db['test1']
         while len(self.id_list) != 0:
             # 加锁
             self.lock.acquire()
@@ -344,7 +346,7 @@ if __name__ == '__main__':
 
     start_time = time.time()
     id_list = Manager().list(id2subject.keys())
-    process_num = 1
+    process_num = 64
     q = Manager().Queue(100)
     l = []
     for i in range(process_num):
