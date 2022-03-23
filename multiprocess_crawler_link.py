@@ -36,7 +36,7 @@ def main_crawler(url, yixiang, request_headers):
         except:
             print("#####Please wait 3 seconds#####")
             time.sleep(3)
-    print(response.url, response.status_code)
+    # print(response.url, response.status_code)
     req_text = response.text
     soup = BeautifulSoup(req_text, 'lxml')
     if soup.find('div', attrs={'class': 'lemmaWgt-subLemmaListTitle'}):
@@ -267,7 +267,7 @@ class CrawlerProcess(Process):
             else:
                 entity_link_dict[choice_id] = link_data
 
-            print(os.getpid(), choice_id, self.q.qsize(), entity_link_dict)
+            # print(os.getpid(), choice_id, self.q.qsize(), entity_link_dict)
 
             # 将抓取到的数据放到队列中保存
             self.q.put(entity_link_dict)
