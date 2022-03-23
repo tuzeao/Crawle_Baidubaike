@@ -16,6 +16,7 @@ from collections import defaultdict
 from multiprocessing import Process, Queue, Manager, Lock
 import pymongo
 lock = Lock()
+import asyncio, aiohttp
 
 
 def construct_url(keyword):
@@ -23,18 +24,24 @@ def construct_url(keyword):
     url = baseurl + str(keyword)
     return url
 
-def main_crawler(url, yixiang, request_headers, db):
+async def main_crawler(url, yixiang, request_headers, db):
     """对知识库中的每一个subject，访问其百度百科页面，然后获取页面下所有的超链接"""
     link_list = []
+
+    times = 0
     while True:
         try:
-            response = requests.get(url, headers=request_headers)
-            break
+            async with aiohttp.ClientSession() as session:
+                response = await session.get(url, headers=request_headers, timeout=1)
+                break
         except:
             print("#####Please wait 3 seconds#####")
-            time.sleep(3)
-    # print(response.url, response.status_code)
+            time.sleep(1)
+            times += 1
+            if times >= 3:
+                return None
     req_text = response.text
+
     soup = BeautifulSoup(req_text, 'lxml')
     if soup.find('div', attrs={'class': 'lemmaWgt-subLemmaListTitle'}):
         # 说明页面进入到多义词列表的页面，需要从多义词列表中找到匹配待检索实体的义项描述的链接
@@ -47,8 +54,8 @@ def main_crawler(url, yixiang, request_headers, db):
                 a_label = li.find('a')
                 redirect_url = "https://baike.baidu.com" + a_label['href']
                 # 重新获取到该subject对应页面的链接地址，访问获取到页面下的所有超链接
-                entity_link_list = get_page_link(redirect_url, request_headers)
-                link_list = iterate_all_page_links(entity_link_list, request_headers, db)
+                entity_link_list = await get_page_link(redirect_url, request_headers)
+                link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
                 return link_list
     elif soup.find('ul', attrs={'class': 'polysemantList-wrapper cmn-clearfix'}):
         # 说明进入了对应subject的百科页面，如果是多义词找到对应义项描述的链接网页
@@ -59,20 +66,20 @@ def main_crawler(url, yixiang, request_headers, db):
             if text == yixiang:
                 if not li.find('a'):
                     # 未发现a标签，则说明是当前页面下，则直接使用原始的Url链接
-                    entity_link_list = get_page_link(url, request_headers)
-                    link_list = iterate_all_page_links(entity_link_list, request_headers, db)
+                    entity_link_list = await get_page_link(url, request_headers)
+                    link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
                     return link_list
                 else:
                     # 否则获取新的重定向链接
                     a_label = li.find('a')
                     redirect_url = "https://baike.baidu.com" + a_label['href']
-                    entity_link_list = get_page_link(redirect_url, request_headers)
-                    link_list = iterate_all_page_links(entity_link_list, request_headers, db)
+                    entity_link_list = await get_page_link(redirect_url, request_headers)
+                    link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
                     return link_list
     elif soup.find('dd', attrs={'class':'lemmaWgt-lemmaTitle-title'}):
         # 如果subject对应的页面是单义词，则直接获取页面下的所有超链接
-        entity_link_list = get_page_link(url, request_headers)
-        link_list = iterate_all_page_links(entity_link_list, request_headers, db)
+        entity_link_list = await get_page_link(url, request_headers)
+        link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
         return link_list
     else:
         # 可能是未知页面，返回None
@@ -85,16 +92,23 @@ def main_crawler(url, yixiang, request_headers, db):
 
 
 
-def get_page_link(url, request_headers):
+async def get_page_link(url, request_headers):
     # entity_link_dict = defaultdict(list)
     entity_link_list = []
+    times = 0
     while True:
         try:
-            req_text = requests.get(url, headers=request_headers).text
-            break
+            async with aiohttp.ClientSession() as session:
+                response = await session.get(url, headers=request_headers, timeout=1)
+                break
         except:
-            print("#####Please wait 10 seconds#####")
-            time.sleep(3)
+            print("#####Please wait 3 seconds#####")
+            time.sleep(1)
+            times += 1
+            if times >= 3:
+                return None
+    req_text = response.text
+
     soup = BeautifulSoup(req_text, 'lxml')
     main_content = soup.find('div', attrs={'class':'main-content'})
     a_label = main_content.find_all('a', attrs={'target':'_blank'})
@@ -111,7 +125,7 @@ def get_page_link(url, request_headers):
 
     return entity_link_list
 
-def iterate_all_page_links(link_list, request_headers, db_all):
+async def iterate_all_page_links(link_list, request_headers, db_all):
     """对于某一个页面下的所有超链接，获取每个超链接的href、页面title和义项描述"""
     title_href = "https://baike.baidu.com"
     baike_id_list = []
@@ -127,20 +141,35 @@ def iterate_all_page_links(link_list, request_headers, db_all):
         link_title = urllib.parse.unquote(quote)
         href = title_href + link
         flag = True
+        times = 0
         while True:
             try:
-                req_text = requests.get(href, headers=request_headers).text
-                break
+                async with aiohttp.ClientSession() as session:
+                    response = await session.get(href, headers=request_headers, timeout=1)
+                    break
             except:
-                flag = False
                 print("#####Please wait 3 seconds#####")
-                time.sleep(3)
+                flag = False
+                time.sleep(1)
+                times += 1
+                if times >= 3:
+                    return None
+
+        # while True:
+        #     try:
+        #         req_text = requests.get(href, headers=request_headers).text
+        #         break
+        #     except:
+        #         flag = False
+        #         print("#####Please wait 3 seconds#####")
+        #         time.sleep(3)
         if not flag:
             # 如果目标超链接页面无效的，则直接跳过该页面
             continue
+        req_text = response.text
         soup = BeautifulSoup(req_text, 'lxml')
         # 得到每个链接对应的义项描述
-        link_label = get_link_label(soup)
+        link_label = await get_link_label(soup)
         if link_label is None:
             continue
         item_dict['Link'] = href
@@ -170,7 +199,7 @@ def iterate_all_page_links(link_list, request_headers, db_all):
 
 
 
-def get_link_label(soup):
+async def get_link_label(soup):
     """获取到对应百度百科页面实体的义项描述，来作为出现多义词时的唯一标识"""
     if soup.find('div', attrs={'class':'lemma-summary'}) is None:
         # 说明出现错误页面，比如页面不存在等情况
@@ -235,7 +264,7 @@ class CrawlerProcess(Process):
         self.describe_dict = describe_dict
         self.request_headers = request_headers
 
-    def run(self):
+    async def run(self):
         # 每一个进程不断从实体池中取实体，直到实体池为空
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
@@ -261,7 +290,7 @@ class CrawlerProcess(Process):
             # 根据实体名，构造百度百科访问地址
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
-            link_data = main_crawler(url, yixiang, self.request_headers, db_all)
+            link_data = await main_crawler(url, yixiang, self.request_headers, db_all)
             entity_link_dict = dict()
             if link_data is None or len(link_data) == 0:
                 # 可能有页面没有超链接的情况
