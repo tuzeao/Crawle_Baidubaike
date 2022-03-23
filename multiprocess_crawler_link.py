@@ -148,10 +148,12 @@ def iterate_all_page_links(link_list, request_headers, db_all):
         item_dict['Label'] = link_label
         link_data.append(item_dict)
         # lock.acquire()
+        _id = f"{link_title}-{link_label}" if link_label != "monoseme" else link_title
+        link_label = link_label if link_label != "monoseme" else "单义词"
         try:
             db_all.insert_one(
                 {
-                    '_id': link_title+link_label,
+                    '_id': _id,
                     # 'text': ''.join(response.xpath('//div[@class="lemma-summary"]').xpath('//div[@class="para"]//text()').getall())
                     'link': href,
                     'title': link_title,
