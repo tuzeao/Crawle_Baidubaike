@@ -179,7 +179,12 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
         item_dict['Link'] = href
         item_dict['Title'] = link_title
         item_dict['Label'] = link_label
+        if tr.search(href):
+            print(f"duplicate: {href+link_title}")
+            continue
         link_data.append(item_dict)
+        tr.insert(href)
+
         # lock.acquire()
         _id = f"{link_title}-{link_label}" if link_label != "monoseme" else link_title
         link_label = link_label if link_label != "monoseme" else "单义词"
@@ -195,7 +200,8 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
                 })
             print(f"insert: {href+link_title}")
         except pymongo.errors.DuplicateKeyError:
-            print(f"duplicate: {href+link_title}")
+            print(f"duplicate insert: {href+link_title}")
+            tr.insert(href)
             pass
         # lock.release()
 
@@ -345,7 +351,7 @@ class CrawlerProcess(Process):
         # 每一个进程不断从实体池中取实体，直到实体池为空
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
-        db_all = db['test2']
+        db_all = db['test1']
 
         # url_list = [
         #     {
@@ -456,7 +462,7 @@ class CrawlerProcess(Process):
                         title=info["Title"],
                         label=info["Label"]
                     ))
-                    tr.insert(info["Link"])
+                    # tr.insert(info["Link"])
 
 
 if __name__ == '__main__':
@@ -486,14 +492,17 @@ if __name__ == '__main__':
 
     start_time = time.time()
     id_list = Manager().list(id2subject.keys())
-    process_num = 1
+    process_num = 64
     q = Manager().Queue(100)
     l = []
     for i in range(process_num):
         p = CrawlerProcess(id_list=id_list, q=q, lock=lock, id2subject=id2subject, describe_dict=describe_dict, request_headers=request_headers)
         p.start()
         l.append(p)
-    [p.join() for p in l]
+    # [p.join() for p in l]
+    for p in l:
+        p.join()
+        time.sleep(1)
 
     rest_result = [q.get() for j in range(q.qsize())]
 
