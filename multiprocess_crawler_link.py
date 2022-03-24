@@ -301,6 +301,25 @@ class Trie:
 tr = Trie()
 
 
+def load():
+    zh_seeds = ['猫', '薄一波', '路飞', '铁树', '梅花', '阿卡迪亚的牧人', '隆中对', '台球', '足球', '北京大学', '贝勒大学',
+                '狗', '鸟', '中国', '美国', '日本', '唐朝', '宋朝', '南极', '北极', '太平洋', '泰山', '世界大战', '北京', '四川',
+                '血液病', '癌症', '甲苯', '染色体', '大数定律', '计算机', '冰川', '第二次世界大战', '太岁', '腾讯', '黑洞', '台风',
+                '地震', '雪崩', '泥石流']
+    with open("seeds.txt", "r", encoding="utf-8") as f:
+        for line in f:
+            zh_seeds.append(line.strip())
+    zh_seeds = set(zh_seeds)
+    output = [Input(
+        link="https://baike.baidu.com/item/" + title,
+        title=title,
+        label=""
+    ) for title in zh_seeds]
+    print(f"output lens: {len(output)}")
+    return output
+
+url_list = load()
+
 
 class CrawlerProcess(Process):
     def __init__(self, id_list, q, lock, id2subject, describe_dict, request_headers):
@@ -319,24 +338,8 @@ class CrawlerProcess(Process):
         self.id2subject = id2subject
         self.describe_dict = describe_dict
         self.request_headers = request_headers
-        self.gen_url_list = self.load()
+        # self.gen_url_list = self.load()
 
-    def load(self):
-        zh_seeds = ['猫', '薄一波', '路飞', '铁树', '梅花', '阿卡迪亚的牧人', '隆中对', '台球', '足球', '北京大学', '贝勒大学',
-                    '狗', '鸟', '中国', '美国', '日本', '唐朝', '宋朝', '南极', '北极', '太平洋', '泰山', '世界大战', '北京', '四川',
-                    '血液病', '癌症', '甲苯', '染色体', '大数定律', '计算机', '冰川', '第二次世界大战', '太岁', '腾讯', '黑洞', '台风',
-                    '地震', '雪崩', '泥石流']
-        with open("seeds.txt", "r", encoding="utf-8") as f:
-            for line in f:
-                zh_seeds.append(line.strip())
-        zh_seeds = set(zh_seeds)
-        output = [Input(
-            link="https://baike.baidu.com/item/"+title,
-            title=title,
-            label=""
-        ) for title in zh_seeds]
-        print(f"output lens: {len(output)}")
-        return output
 
     def run(self):
         # 每一个进程不断从实体池中取实体，直到实体池为空
@@ -355,7 +358,7 @@ class CrawlerProcess(Process):
         # url_list = [Input(link="https://baike.baidu.com/item/%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD",
         #                   title="中国",
         #                   label="中华人民共和国")]
-        url_list = self.gen_url_list
+        # url_list = self.gen_url_list
 
         # tr.insert(url_list[0])
         # mark_list = {"中国-中华人民共和国"}
