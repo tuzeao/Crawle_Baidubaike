@@ -136,13 +136,16 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
     for link in link_list:
         item_dict = dict()
         # baike_id = link.split('/')[-1]  # 获取该实体在百度百科知识库中的id
-        if link in baike_id_list:
+        # if link in baike_id_list:
             # 避免访问重复的超链接
-            continue
-        baike_id_list.append(link)
+            # continue
+        # baike_id_list.append(link)
         quote = link.split('/')[2]    # 获取链接的标题
         link_title = urllib.parse.unquote(quote)
         href = title_href + link
+        if tr.search(href):
+            print(f"duplicate: {href+link_title}")
+            continue
         flag = True
         times = 0
         while True:
@@ -179,11 +182,8 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
         item_dict['Link'] = href
         item_dict['Title'] = link_title
         item_dict['Label'] = link_label
-        if tr.search(href):
-            print(f"duplicate: {href+link_title}")
-            continue
+
         link_data.append(item_dict)
-        tr.insert(href)
 
         # lock.acquire()
         _id = f"{link_title}-{link_label}" if link_label != "monoseme" else link_title
@@ -462,7 +462,7 @@ class CrawlerProcess(Process):
                         title=info["Title"],
                         label=info["Label"]
                     ))
-                    # tr.insert(info["Link"])
+                    tr.insert(info["Link"])
 
 
 if __name__ == '__main__':
