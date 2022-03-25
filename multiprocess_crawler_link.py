@@ -332,7 +332,7 @@ def load():
         title=title,
         label=""
     ) for title in zh_seeds]
-    output = set(output)
+    # output = set(output)
     print(f"output lens: {len(output)}")
     return output
 
@@ -340,7 +340,7 @@ def load():
 
 
 class CrawlerProcess(Process):
-    def __init__(self, request_headers, olds, url_list, record):
+    def __init__(self, request_headers, olds, url_list, record, lock):
         """
         :param id_list: 包含实体id的实体池
         :param q: 每个进程保存爬取结果的队列
@@ -384,59 +384,6 @@ class CrawlerProcess(Process):
 
         # tr.insert(url_list[0])
         # mark_list = {"中国-中华人民共和国"}
-
-        # while len(self.id_list) != 0:
-        #     # 加锁
-        #     self.lock.acquire()
-        #     if len(self.id_list) == 0:
-        #         # 额外的一个退出判断，防止出现只有最后一个实体，但有多个进程进入了while循环的情况
-        #         self.lock.release()
-        #         break
-        #     # 从实体池中随机选取一个实体
-        #     choice_id = random.choice(self.id_list)
-        #     # 选完后删除
-        #     self.id_list.remove(choice_id)
-        #     # 解锁
-        #     self.lock.release()
-        #
-        #     # 由实体id转换为对应的实体名
-        #     subject = self.id2subject[choice_id]
-        #     # 这里的义项描述，则表示额外的消歧信息，来帮助获取到正确的对应页面
-        #     yixiang = self.describe_dict[choice_id]
-        #     # 根据实体名，构造百度百科访问地址
-        #     url = construct_url(keyword=subject)
-        #     # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
-        #     link_data = asyncio.get_event_loop().run_until_complete(main_crawler(url, yixiang, self.request_headers, db_all))
-        #     entity_link_dict = dict()
-        #     if link_data is None or len(link_data) == 0:
-        #         # 可能有页面没有超链接的情况
-        #         entity_link_dict[choice_id] = "Null"
-        #     else:
-        #         entity_link_dict[choice_id] = link_data
-        #
-        #     if link_data:
-        #         _tmp = [x["Link"] for x in link_data]
-        #         url_list.append(_tmp)
-        #
-        #
-        #     # print(os.getpid(), choice_id, self.q.qsize(), entity_link_dict)
-        #
-        #     # 将抓取到的数据放到队列中保存
-        #     # self.q.put(entity_link_dict)
-        #
-        #     # 判断队列是否满队
-        #     # if self.q.full():
-        #         # 释放队列内容，直到队列为空
-        #         # while not self.q.empty():
-        #         #     link_dict = self.q.get()
-        #             # 因为需要对本地文件进行写入，所以也需要加入锁，防止不同进程之间的写入混乱
-        #             # self.lock.acquire()
-        #             # with open('./multi_link_data/subject_hyperlinks.json', 'a', encoding='utf-8') as fin:
-        #             #     json.dump(link_dict, fin, ensure_ascii=False)
-        #             #     fin.write('\n')
-        #             # self.lock.release()
-        # url_list = self.url_list
-        # record = self.record
 
         while len(self.url_list) != 0:
             # 加锁
@@ -533,9 +480,10 @@ if __name__ == '__main__':
     print(len(olds))
     url_list = load()
     record = set()
+    length = (len(url_list) // 64)+1
 
     for i in range(process_num):
-        p = CrawlerProcess(request_headers=request_headers, olds=olds, url_list=url_list, record=record)
+        p = CrawlerProcess(request_headers=request_headers, olds=olds, url_list=set(url_list[i*length:(i+1)*length]), record=record, lock=lock)
         p.start()
         l.append(p)
         time.sleep(1)
