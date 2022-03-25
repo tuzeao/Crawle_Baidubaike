@@ -339,7 +339,7 @@ record = set()
 
 
 class CrawlerProcess(Process):
-    def __init__(self, request_headers):
+    def __init__(self, request_headers, db, olds):
         """
         :param id_list: 包含实体id的实体池
         :param q: 每个进程保存爬取结果的队列
@@ -351,6 +351,8 @@ class CrawlerProcess(Process):
         Process.__init__(self)
         self.request_headers = request_headers
         self.lock = lock
+        self.db = db
+        self.olds = olds
 
     def run(self):
         # # 每一个进程不断从实体池中取实体，直到实体池为空
@@ -358,12 +360,6 @@ class CrawlerProcess(Process):
         # # db_all = db['triple']
         # db_all = db['test1']
 
-        # 每一个进程不断从实体池中取实体，直到实体池为空
-        db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
-        # db_all = db['triple']
-        db_all = db['test2']
-        olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
-        print(len(olds))
         # url_list = [
         #     {
         #         "Link": "https://baike.baidu.com/item/%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD",
@@ -506,8 +502,16 @@ if __name__ == '__main__':
     start_time = time.time()
     process_num = 1
     l = []
+
+    # 每一个进程不断从实体池中取实体，直到实体池为空
+    db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
+    # db_all = db['triple']
+    db_all = db['test2']
+    olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
+    print(len(olds))
+
     for i in range(process_num):
-        p = CrawlerProcess(request_headers=request_headers)
+        p = CrawlerProcess(request_headers=request_headers, db=db_all, olds=olds)
         p.start()
         l.append(p)
         time.sleep(1)
