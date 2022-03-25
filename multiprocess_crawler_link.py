@@ -507,9 +507,9 @@ if __name__ == '__main__':
         p = CrawlerProcess(request_headers=request_headers)
         p.start()
         l.append(p)
+        time.sleep(1)
     for p in l:
         p.join()
-        time.sleep(1)
 
 
     print("time: ", time.time() - start_time)
