@@ -143,9 +143,13 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
         quote = link.split('/')[2]    # 获取链接的标题
         link_title = urllib.parse.unquote(quote)
         href = title_href + link
-        if tr.search(href):
+        # if tr.search(href):
+        #     print(f"duplicate: {href+link_title}")
+        #     continue
+        if href in record:
             print(f"duplicate: {href+link_title}")
             continue
+
         flag = True
         times = 0
         while True:
@@ -188,6 +192,7 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
         # lock.acquire()
         _id = f"{link_title}-{link_label}" if link_label != "monoseme" else link_title
         link_label = link_label if link_label != "monoseme" else "单义词"
+        if _id in olds: continue
         try:
             db_all.insert_one(
                 {
@@ -201,7 +206,8 @@ async def iterate_all_page_links(link_list, request_headers, db_all):
             print(f"insert: {href+link_title}")
         except pymongo.errors.DuplicateKeyError:
             print(f"duplicate insert: {href+link_title}")
-            tr.insert(href)
+            # tr.insert(href)
+            record.add(href)
             pass
         # lock.release()
 
@@ -321,14 +327,22 @@ def load():
         title=title,
         label=""
     ) for title in zh_seeds]
+    output = set(output)
     print(f"output lens: {len(output)}")
     return output
 
 url_list = load()
+record = set()
+# 每一个进程不断从实体池中取实体，直到实体池为空
+db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
+# db_all = db['triple']
+db_all = db['test1']
+olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
+
 
 
 class CrawlerProcess(Process):
-    def __init__(self, id_list, q, lock, id2subject, describe_dict, request_headers):
+    def __init__(self, request_headers):
         """
         :param id_list: 包含实体id的实体池
         :param q: 每个进程保存爬取结果的队列
@@ -338,20 +352,16 @@ class CrawlerProcess(Process):
         :param request_headers: requests访问请求头
         """
         Process.__init__(self)
-        self.id_list = id_list
-        self.q = q
-        self.lock = lock
-        self.id2subject = id2subject
-        self.describe_dict = describe_dict
         self.request_headers = request_headers
-        # self.gen_url_list = self.load()
-
+        self.lock = lock
 
     def run(self):
-        # 每一个进程不断从实体池中取实体，直到实体池为空
-        db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
-        # db_all = db['triple']
-        db_all = db['test1']
+        # # 每一个进程不断从实体池中取实体，直到实体池为空
+        # db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
+        # # db_all = db['triple']
+        # db_all = db['test1']
+
+
 
         # url_list = [
         #     {
@@ -429,13 +439,15 @@ class CrawlerProcess(Process):
                 break
             # 从实体池中随机选取一个实体
             # url_info = url_list[-1]
-            url_info = random.choice(url_list)
+            # url_info = random.choice(url_list)
+            url_info = url_list.pop()
             # 选完后删除
-            url_list.remove(url_info)
+            # url_list.remove(url_info)
             # url_list.pop()
             # 解锁
             self.lock.release()
-            if tr.search(url_info.link): continue
+            # if tr.search(url_info.link): continue
+            if url_info.link in record: continue
 
             # 由实体id转换为对应的实体名
             subject = url_info.title
@@ -455,14 +467,21 @@ class CrawlerProcess(Process):
 
             if link_data:
                 for info in link_data:
-                    if tr.search(info["Link"]):
-                        continue
-                    url_list.append(Input(
+                    # if tr.search(info["Link"]): continue
+                    if info["Link"] in record: continue
+                    # url_list.append(Input(
+                    #     link=info["Link"],
+                    #     title=info["Title"],
+                    #     label=info["Label"]
+                    # ))
+                    url_list.add(Input(
                         link=info["Link"],
                         title=info["Title"],
                         label=info["Label"]
                     ))
-                    tr.insert(info["Link"])
+                    record.add(info["Link"])
+
+                    # tr.insert(info["Link"])
 
 
 if __name__ == '__main__':
@@ -482,29 +501,17 @@ if __name__ == '__main__':
         'User-Agent': 'Mozilla/5.0(Windows NT 10.0; Win64; x64) AppleWebKit / 537.36(KHTML, like Gecko) Chrome/81.0.4044.129 Safari / 537.36'
     }
 
-    id2subject_path = './data/id2subject.pkl'
-    id2subject = pd.read_pickle(id2subject_path)
-
-    yixiangmiaoshu_path = './data/describe_dict.pkl'
-    describe_dict = pd.read_pickle(yixiangmiaoshu_path)
-    # subject_list = list(id2subject.values())
-    # test_subject = {'10026':'龙泉驿区', '10124':"JAZZ", '10051':'海市蜃楼'}
-
     start_time = time.time()
-    id_list = Manager().list(id2subject.keys())
     process_num = 64
-    q = Manager().Queue(100)
     l = []
     for i in range(process_num):
-        p = CrawlerProcess(id_list=id_list, q=q, lock=lock, id2subject=id2subject, describe_dict=describe_dict, request_headers=request_headers)
+        p = CrawlerProcess(request_headers=request_headers)
         p.start()
         l.append(p)
-    # [p.join() for p in l]
     for p in l:
         p.join()
         time.sleep(1)
 
-    rest_result = [q.get() for j in range(q.qsize())]
 
     print("time: ", time.time() - start_time)
 
