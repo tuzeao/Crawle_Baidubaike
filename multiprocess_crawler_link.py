@@ -363,8 +363,8 @@ class CrawlerProcess(Process):
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
         db_all = db['test2']
-        olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
-        print(len(olds))
+        # olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
+        # print(len(olds))
 
         # url_list = [
         #     {
@@ -461,7 +461,7 @@ class CrawlerProcess(Process):
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
             link_data = asyncio.get_event_loop().run_until_complete(
-                main_crawler(url, yixiang, self.request_headers, db_all, olds))
+                main_crawler(url, yixiang, self.request_headers, db_all, self.olds))
             # entity_link_dict = dict()
             # if link_data is None or len(link_data) == 0:
             #     # 可能有页面没有超链接的情况
