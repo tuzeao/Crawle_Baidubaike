@@ -336,13 +336,11 @@ def load():
     print(f"output lens: {len(output)}")
     return output
 
-url_list = load()
-record = set()
 
 
 
 class CrawlerProcess(Process):
-    def __init__(self, request_headers, olds):
+    def __init__(self, request_headers, olds, url_list, record):
         """
         :param id_list: 包含实体id的实体池
         :param q: 每个进程保存爬取结果的队列
@@ -356,6 +354,8 @@ class CrawlerProcess(Process):
         self.lock = lock
         # self.db = db
         self.olds = olds
+        self.url_list = url_list
+        self.record = record
 
     def run(self):
         # # 每一个进程不断从实体池中取实体，直到实体池为空
@@ -435,25 +435,27 @@ class CrawlerProcess(Process):
         #             #     json.dump(link_dict, fin, ensure_ascii=False)
         #             #     fin.write('\n')
         #             # self.lock.release()
+        # url_list = self.url_list
+        # record = self.record
 
-        while len(url_list) != 0:
+        while len(self.url_list) != 0:
             # 加锁
             self.lock.acquire()
-            if len(url_list) == 0:
+            if len(self.url_list) == 0:
                 # 额外的一个退出判断，防止出现只有最后一个实体，但有多个进程进入了while循环的情况
                 self.lock.release()
                 break
             # 从实体池中随机选取一个实体
             # url_info = url_list[-1]
             # url_info = random.choice(url_list)
-            url_info = url_list.pop()
+            url_info = self.url_list.pop()
             # 选完后删除
             # url_list.remove(url_info)
             # url_list.pop()
             # 解锁
             self.lock.release()
             # if tr.search(url_info.link): continue
-            if url_info.link in record: continue
+            if url_info.link in self.record: continue
 
             # 由实体id转换为对应的实体名
             subject = url_info.title
@@ -475,18 +477,18 @@ class CrawlerProcess(Process):
             if link_data:
                 for info in link_data:
                     # if tr.search(info["Link"]): continue
-                    if info["Link"] in record: continue
+                    if info["Link"] in self.record: continue
                     # url_list.append(Input(
                     #     link=info["Link"],
                     #     title=info["Title"],
                     #     label=info["Label"]
                     # ))
-                    url_list.add(Input(
+                    self.url_list.add(Input(
                         link=info["Link"],
                         title=info["Title"],
                         label=info["Label"]
                     ))
-                    record.add(info["Link"])
+                    self.record.add(info["Link"])
 
                     # tr.insert(info["Link"])
 
@@ -529,9 +531,11 @@ if __name__ == '__main__':
     #print(len(olds))
     #olds = set(olds)
     print(len(olds))
+    url_list = load()
+    record = set()
 
     for i in range(process_num):
-        p = CrawlerProcess(request_headers=request_headers, olds=olds)
+        p = CrawlerProcess(request_headers=request_headers, olds=olds, url_list=url_list, record=record)
         p.start()
         l.append(p)
         time.sleep(1)
