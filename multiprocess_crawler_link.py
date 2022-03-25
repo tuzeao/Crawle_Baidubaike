@@ -24,7 +24,7 @@ def construct_url(keyword):
     url = baseurl + str(keyword)
     return url
 
-async def main_crawler(url, yixiang, request_headers, db):
+async def main_crawler(url, yixiang, request_headers, db, olds):
     """对知识库中的每一个subject，访问其百度百科页面，然后获取页面下所有的超链接"""
     link_list = []
 
@@ -55,7 +55,7 @@ async def main_crawler(url, yixiang, request_headers, db):
                 redirect_url = "https://baike.baidu.com" + a_label['href']
                 # 重新获取到该subject对应页面的链接地址，访问获取到页面下的所有超链接
                 entity_link_list = await get_page_link(redirect_url, request_headers)
-                link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
+                link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
                 return link_list
     elif soup.find('ul', attrs={'class': 'polysemantList-wrapper cmn-clearfix'}):
         # 说明进入了对应subject的百科页面，如果是多义词找到对应义项描述的链接网页
@@ -128,7 +128,7 @@ async def get_page_link(url, request_headers):
 
     return entity_link_list
 
-async def iterate_all_page_links(link_list, request_headers, db_all):
+async def iterate_all_page_links(link_list, request_headers, db_all, olds):
     """对于某一个页面下的所有超链接，获取每个超链接的href、页面title和义项描述"""
     title_href = "https://baike.baidu.com"
     baike_id_list = []
@@ -333,11 +333,6 @@ def load():
 
 url_list = load()
 record = set()
-# 每一个进程不断从实体池中取实体，直到实体池为空
-db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
-# db_all = db['triple']
-db_all = db['test1']
-olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
 
 
 
@@ -361,7 +356,11 @@ class CrawlerProcess(Process):
         # # db_all = db['triple']
         # db_all = db['test1']
 
-
+        # 每一个进程不断从实体池中取实体，直到实体池为空
+        db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
+        # db_all = db['triple']
+        db_all = db['test1']
+        olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
 
         # url_list = [
         #     {
@@ -457,7 +456,7 @@ class CrawlerProcess(Process):
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
             link_data = asyncio.get_event_loop().run_until_complete(
-                main_crawler(url, yixiang, self.request_headers, db_all))
+                main_crawler(url, yixiang, self.request_headers, db_all, olds))
             # entity_link_dict = dict()
             # if link_data is None or len(link_data) == 0:
             #     # 可能有页面没有超链接的情况
