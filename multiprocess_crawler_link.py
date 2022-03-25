@@ -67,19 +67,19 @@ async def main_crawler(url, yixiang, request_headers, db, olds):
                 if not li.find('a'):
                     # 未发现a标签，则说明是当前页面下，则直接使用原始的Url链接
                     entity_link_list = await get_page_link(url, request_headers)
-                    link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
+                    link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
                     return link_list
                 else:
                     # 否则获取新的重定向链接
                     a_label = li.find('a')
                     redirect_url = "https://baike.baidu.com" + a_label['href']
                     entity_link_list = await get_page_link(redirect_url, request_headers)
-                    link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
+                    link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
                     return link_list
     elif soup.find('dd', attrs={'class':'lemmaWgt-lemmaTitle-title'}):
         # 如果subject对应的页面是单义词，则直接获取页面下的所有超链接
         entity_link_list = await get_page_link(url, request_headers)
-        link_list = await iterate_all_page_links(entity_link_list, request_headers, db)
+        link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
         return link_list
     else:
         # 可能是未知页面，返回None
@@ -204,10 +204,12 @@ async def iterate_all_page_links(link_list, request_headers, db_all, olds):
                     'text': req_text
                 })
             print(f"insert: {href+link_title}")
+            olds.add(f"{link_title}-{link_label}") 
         except pymongo.errors.DuplicateKeyError:
             print(f"duplicate insert: {href+link_title}")
             # tr.insert(href)
             record.add(href)
+            olds.add(f"{link_title}-{link_label}")
             pass
         # lock.release()
 
@@ -359,9 +361,9 @@ class CrawlerProcess(Process):
         # 每一个进程不断从实体池中取实体，直到实体池为空
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
-        db_all = db['test1']
+        db_all = db['test2']
         olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
-
+        print(len(olds))
         # url_list = [
         #     {
         #         "Link": "https://baike.baidu.com/item/%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD",
@@ -453,6 +455,7 @@ class CrawlerProcess(Process):
             # 这里的义项描述，则表示额外的消歧信息，来帮助获取到正确的对应页面
             yixiang = url_info.label
             # 根据实体名，构造百度百科访问地址
+            if f"{subject}-{yixiang}" in olds: continue
             url = construct_url(keyword=subject)
             # 对于每个subject，获取符合其义项描述的对应页面下的所有超链接
             link_data = asyncio.get_event_loop().run_until_complete(
@@ -501,7 +504,7 @@ if __name__ == '__main__':
     }
 
     start_time = time.time()
-    process_num = 64
+    process_num = 1
     l = []
     for i in range(process_num):
         p = CrawlerProcess(request_headers=request_headers)
