@@ -204,7 +204,7 @@ async def iterate_all_page_links(link_list, request_headers, db_all, olds):
                     'text': req_text
                 })
             print(f"insert: {href+link_title}")
-            olds.add(f"{link_title}-{link_label}") 
+            olds.add(f"{link_title}-{link_label}" if link_label != "单义词" else link_title) 
         except pymongo.errors.DuplicateKeyError:
             print(f"duplicate insert: {href+link_title}")
             # tr.insert(href)
@@ -362,7 +362,7 @@ class CrawlerProcess(Process):
         # 每一个进程不断从实体池中取实体，直到实体池为空
         db = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
         # db_all = db['triple']
-        db_all = db['test2']
+        db_all = db['test1']
         # olds = set([item['_id'] for item in db_all.find({}, {'_id': 1})])
         # print(len(olds))
 
@@ -506,12 +506,25 @@ if __name__ == '__main__':
     }
 
     start_time = time.time()
-    process_num = 1
+    process_num = 64
     l = []
     temp = pymongo.MongoClient("mongodb://zj184x.corp.youdao.com:30000/")["chat_baike"]
     # db_all = db['triple']
-    temp_all = temp['test2']
-    olds = set([item['_id'] for item in temp_all.find({}, {'_id': 1})])
+    temp_all = temp['test1']
+    
+    #import tqdm
+    olds = set()
+    count = 0
+    cursor = temp_all.find({}, {'_id': 1}).batch_size(200)
+    #print(1111111111111111)
+    for item in cursor:
+        olds.add(item['_id'])
+        count += 1
+        if count % 10000 == 0: 
+            print(count)
+    #olds = [item['_id'] for item in temp_all.find({}, {'_id': 1})]
+    #print(len(olds))
+    #olds = set(olds)
     print(len(olds))
 
     for i in range(process_num):
