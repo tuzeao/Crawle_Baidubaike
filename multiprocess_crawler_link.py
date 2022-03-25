@@ -187,12 +187,15 @@ async def iterate_all_page_links(link_list, request_headers, db_all, olds):
         item_dict['Title'] = link_title
         item_dict['Label'] = link_label
 
-        link_data.append(item_dict)
 
         # lock.acquire()
         _id = f"{link_title}-{link_label}" if link_label != "monoseme" else link_title
+        if _id in olds or href in record: continue
+        link_data.append(item_dict)
+
         link_label = link_label if link_label != "monoseme" else "单义词"
-        if _id in olds: continue
+
+
         try:
             db_all.insert_one(
                 {
