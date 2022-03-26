@@ -76,6 +76,14 @@ async def main_crawler(url, yixiang, request_headers, db, olds):
                     entity_link_list = await get_page_link(redirect_url, request_headers)
                     link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
                     return link_list
+            else:
+                if li.find('a'):
+                    a_label = li.find('a')
+                    redirect_url = "https://baike.baidu.com" + a_label['href']
+                    entity_link_list = await get_page_link(redirect_url, request_headers)
+                    link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
+                    return link_list
+
     elif soup.find('dd', attrs={'class':'lemmaWgt-lemmaTitle-title'}):
         # 如果subject对应的页面是单义词，则直接获取页面下的所有超链接
         entity_link_list = await get_page_link(url, request_headers)
