@@ -387,11 +387,11 @@ class CrawlerProcess(Process):
 
         while len(self.url_list) != 0:
             # 加锁
-            self.lock.acquire()
-            if len(self.url_list) == 0:
+            #self.lock.acquire()
+            #if len(self.url_list) == 0:
                 # 额外的一个退出判断，防止出现只有最后一个实体，但有多个进程进入了while循环的情况
-                self.lock.release()
-                break
+            #    self.lock.release()
+            #    break
             # 从实体池中随机选取一个实体
             # url_info = url_list[-1]
             # url_info = random.choice(url_list)
@@ -400,7 +400,7 @@ class CrawlerProcess(Process):
             # url_list.remove(url_info)
             # url_list.pop()
             # 解锁
-            self.lock.release()
+            #self.lock.release()
             # if tr.search(url_info.link): continue
             if url_info.link in self.record: continue
 
