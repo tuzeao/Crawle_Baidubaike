@@ -27,7 +27,7 @@ def construct_url(keyword):
 
 async def main_crawler(url, yixiang, request_headers, db, olds):
     """对知识库中的每一个subject，访问其百度百科页面，然后获取页面下所有的超链接"""
-    link_list = []
+    link_list_all = []
 
     times = 0
     while True:
@@ -57,7 +57,8 @@ async def main_crawler(url, yixiang, request_headers, db, olds):
                 # 重新获取到该subject对应页面的链接地址，访问获取到页面下的所有超链接
                 entity_link_list = await get_page_link(redirect_url, request_headers)
                 link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
-                return link_list
+                # return link_list
+                link_list_all.extend(link_list)
     elif soup.find('ul', attrs={'class': 'polysemantList-wrapper cmn-clearfix'}):
         # 说明进入了对应subject的百科页面，如果是多义词找到对应义项描述的链接网页
         ul_label = soup.find('ul', attrs={'class': 'polysemantList-wrapper cmn-clearfix'})
@@ -69,33 +70,37 @@ async def main_crawler(url, yixiang, request_headers, db, olds):
                     # 未发现a标签，则说明是当前页面下，则直接使用原始的Url链接
                     entity_link_list = await get_page_link(url, request_headers)
                     link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
-                    return link_list
+                    # return link_list
+                    link_list_all.extend(link_list)
                 else:
                     # 否则获取新的重定向链接
                     a_label = li.find('a')
                     redirect_url = "https://baike.baidu.com" + a_label['href']
                     entity_link_list = await get_page_link(redirect_url, request_headers)
                     link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
-                    return link_list
+                    # return link_list
+                    link_list_all.extend(link_list)
             else:
                 if li.find('a'):
                     a_label = li.find('a')
                     redirect_url = "https://baike.baidu.com" + a_label['href']
                     entity_link_list = await get_page_link(redirect_url, request_headers)
                     link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
-                    return link_list
+                    # return link_list
+                    link_list_all.extend(link_list)
 
     elif soup.find('dd', attrs={'class':'lemmaWgt-lemmaTitle-title'}):
         # 如果subject对应的页面是单义词，则直接获取页面下的所有超链接
         entity_link_list = await get_page_link(url, request_headers)
         link_list = await iterate_all_page_links(entity_link_list, request_headers, db, olds)
-        return link_list
+        # return link_list
+        link_list_all.extend(link_list)
     else:
         # 可能是未知页面，返回None
         # 存在是多义词，在其义项描述不在百度百科多义词列表里。
         return None
 
-    if len(link_list) == 0:
+    if len(link_list_all) == 0:
         # 说明百度百科页面中没有相应的义项描述与之对应，返回None
         return None
 
