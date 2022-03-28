@@ -17,6 +17,7 @@ from multiprocessing import Process, Queue, Manager, Lock
 import pymongo
 lock = Lock()
 import asyncio, aiohttp
+import datetime
 
 
 def construct_url(keyword):
@@ -214,7 +215,7 @@ async def iterate_all_page_links(link_list, request_headers, db_all, olds):
                     'label': link_label,
                     'text': req_text
                 })
-            print(f"insert: {href+link_title}")
+            print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} insert: {href+link_title}")
             olds.add(f"{link_title}-{link_label}" if link_label != "单义词" else link_title) 
         except pymongo.errors.DuplicateKeyError:
             print(f"duplicate insert: {href+link_title}")
